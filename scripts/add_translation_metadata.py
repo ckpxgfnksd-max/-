@@ -17,33 +17,45 @@ CONTENT_DIR = Path(__file__).parent.parent / "content"
 
 def get_front_matter(content: str) -> tuple[str, str]:
     """Split content into front matter and body.
-    
+
     Supports two formats:
-    1. YAML-style with --- delimiters
+    1. YAML-style with --- delimiters on their own lines
     2. Pelican-style without delimiters (first blank line separates)
+
+    Also handles a common hybrid: an opening --- fence without a closing
+    fence. Those must NOT be parsed with naive str.split("---"), which
+    (a) leaves the opening fence inside the metadata and re-wraps it into
+    an empty YAML document that Pelican skips, and (b) can truncate the
+    body if "---" appears later in the article.
     """
-    # Try YAML-style first
-    if content.startswith("---"):
-        parts = content.split("---", 2)
-        if len(parts) >= 3:
-            return parts[1].strip(), "---".join(parts[2:])
-    
-    # Pelican-style: everything before first blank line
     lines = content.split("\n")
+
+    # YAML-style: opening --- and a matching closing --- on their own lines
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], 1):
+            if line.strip() == "---":
+                front_matter = "\n".join(lines[1:i]).strip()
+                body = "\n" + "\n".join(lines[i + 1 :])
+                return front_matter, body
+        # Opening fence without closing fence: skip the fence line and
+        # fall through to Pelican-style parsing of the remainder.
+        lines = lines[1:]
+
+    # Pelican-style: everything before first blank line
     front_matter_lines = []
-    body_start = 0
-    
+    body_start = len(lines)
+
     for i, line in enumerate(lines):
         if line.strip() == "":
             body_start = i
             break
         front_matter_lines.append(line)
-    
+
     if front_matter_lines:
         front_matter = "\n".join(front_matter_lines)
         body = "\n" + "\n".join(lines[body_start:])
         return front_matter, body
-    
+
     return "", content
 
 
