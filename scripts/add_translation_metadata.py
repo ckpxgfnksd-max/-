@@ -30,14 +30,19 @@ def get_front_matter(content: str) -> tuple[str, str]:
     """
     lines = content.split("\n")
 
-    # YAML-style: opening --- and a matching closing --- on their own lines
+    # YAML-style: opening --- and a matching closing --- on their own lines.
+    # The closer must appear before the first blank line; otherwise a later
+    # "---" inside the article body would be mistaken for the fence and
+    # silently truncate the post.
     if lines and lines[0].strip() == "---":
         for i, line in enumerate(lines[1:], 1):
             if line.strip() == "---":
                 front_matter = "\n".join(lines[1:i]).strip()
                 body = "\n" + "\n".join(lines[i + 1 :])
                 return front_matter, body
-        # Opening fence without closing fence: skip the fence line and
+            if line.strip() == "":
+                break
+        # Opening fence without a metadata closer: skip the fence line and
         # fall through to Pelican-style parsing of the remainder.
         lines = lines[1:]
 
