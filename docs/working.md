@@ -2,6 +2,10 @@
 
 ## Changelog
 
+### 2026-07-26 - 修复 Translation 脚本会静默毁掉文章的问题
+
+`scripts/add_translation_metadata.py` 用 `str.split("---")` 解析 front matter。对只有开头 `---`、没有结尾 fence 的 11 篇中文文章，脚本会把开头的 `---` 写进 metadata，再包一层 `---`，生成空的 YAML 文档；Pelican 读不到 `title`，下次 publish 会直接丢掉这些页面。顺带也会在正文出现 `---` 时截断正文。已改为按行识别成对 fence，并为该脚本加了回归测试。
+
 ### 2026-03-30 - Web Layout Trade-off 文章（中英双语）
 
 新增两篇博客文章，从 Pretext 库和一条读者评论出发，分析了 CSS 声明式布局隐藏排版中间状态的架构 trade-off，跨平台对比 iOS/Android/Web 的分层差异，连接到 AI 工程中保护性抽象 vs 激进透明的同构问题。
