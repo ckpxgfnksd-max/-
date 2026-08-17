@@ -15,35 +15,50 @@ from typing import Optional
 CONTENT_DIR = Path(__file__).parent.parent / "content"
 
 
+def _split_at_blank(lines: list[str], start: int) -> tuple[str, str]:
+    """Pelican-style: metadata is contiguous lines until the first blank."""
+    fm_lines: list[str] = []
+    body_start = start
+    for i in range(start, len(lines)):
+        if lines[i].strip() == "":
+            body_start = i
+            break
+        fm_lines.append(lines[i])
+    else:
+        return "\n".join(fm_lines).strip(), ""
+    body = "\n" + "\n".join(lines[body_start:])
+    return "\n".join(fm_lines).strip(), body
+
+
 def get_front_matter(content: str) -> tuple[str, str]:
     """Split content into front matter and body.
-    
+
     Supports two formats:
     1. YAML-style with --- delimiters
     2. Pelican-style without delimiters (first blank line separates)
+
+    A closing --- counts only before the first blank line. Opening-fence-only
+    files (a leading --- and no closer before that blank line) are treated as
+    Pelican-style after skipping the fence. Naive str.split("---") would
+    otherwise keep the opening fence in metadata (rewritten into an empty YAML
+    document) or treat a later markdown HR as the closer (silent intro loss).
     """
-    # Try YAML-style first
-    if content.startswith("---"):
-        parts = content.split("---", 2)
-        if len(parts) >= 3:
-            return parts[1].strip(), "---".join(parts[2:])
-    
-    # Pelican-style: everything before first blank line
     lines = content.split("\n")
-    front_matter_lines = []
-    body_start = 0
-    
-    for i, line in enumerate(lines):
-        if line.strip() == "":
-            body_start = i
-            break
-        front_matter_lines.append(line)
-    
-    if front_matter_lines:
-        front_matter = "\n".join(front_matter_lines)
-        body = "\n" + "\n".join(lines[body_start:])
-        return front_matter, body
-    
+
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], start=1):
+            if line.strip() == "":
+                return _split_at_blank(lines, 1)
+            if line.strip() == "---":
+                front_matter = "\n".join(lines[1:i]).strip()
+                rest = lines[i + 1 :]
+                body = ("\n" + "\n".join(rest)) if rest else ""
+                return front_matter, body
+        return "\n".join(lines[1:]).strip(), ""
+
+    if lines:
+        return _split_at_blank(lines, 0)
+
     return "", content
 
 
